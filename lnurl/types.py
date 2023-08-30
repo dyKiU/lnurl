@@ -51,7 +51,7 @@ class Bech32(ReprMixin, str):
 
 def ctrl_characters_validator(value: str) -> str:
     """Checks for control characters (unicode blocks C0 and C1, plus DEL)."""
-    if re.compile(r"[\u0000-\u001f\u007f-\u009f]").search(value):
+    if re.compile(r"[\u0000-\u001f\u007f-\u009f]").search(str(value)):
         raise ValidationError
     return value
 
