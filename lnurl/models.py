@@ -1,7 +1,8 @@
 import math
 from typing import List, Literal, Optional, Union
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, PositiveInt
+
 
 from .exceptions import LnurlResponseException
 from .types import (
@@ -45,7 +46,7 @@ class UrlAction(LnurlPaySuccessAction):
 
 
 class LnurlResponseModel(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, arbitrary_types_allowed=True)
 
     def dict(self, **kwargs):
         kwargs.setdefault("by_alias", True)

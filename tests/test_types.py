@@ -3,16 +3,20 @@ from typing import Union
 import pytest
 from pydantic import TypeAdapter, ValidationError
 
+from lnurl.models import LnurlResponseModel
+
 from lnurl.helpers import _lnurl_clean
 from lnurl.types import (
     ClearnetUrl,
     DebugUrl,
     LightningInvoice,
     LightningNodeUri,
+    LnNodeUriModel,
     Lnurl,
     LnurlPayMetadata,
     OnionUrl,
 )
+
 
 
 class TestUrl:
@@ -115,16 +119,16 @@ class TestLightningInvoice:
 
 class TestLightningNode:
     def test_valid(self):
-        adapter = TypeAdapter(LightningNodeUri)
-        node = adapter.validate_python("node_key@ip_address:port_number")
+        adapter = TypeAdapter(LnNodeUriModel)
+        node = adapter.validate_python(LightningNodeUri("node_key@ip_address:5000"))
         assert node.key == "node_key"
         assert node.ip == "ip_address"
-        assert node.port == "port_number"
+        assert node.port == 5000
 
-    @pytest.mark.parametrize("uri", ["https://service.io/node", "node_key@ip_address", "ip_address:port_number"])
+    @pytest.mark.parametrize("uri", ["https://service.io/node", "node_key@ip_address", "ip_address:5000"])
     def test_invalid_data(self, uri):
         with pytest.raises(ValidationError):
-            adapter = TypeAdapter(LightningNodeUri)
+            adapter = TypeAdapter(LnNodeUriModel)
             adapter.validate_python(uri)
 
 

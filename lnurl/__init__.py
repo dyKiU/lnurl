@@ -9,6 +9,7 @@ from .models import (
     LnurlResponse,
     LnurlSuccessResponse,
     LnurlWithdrawResponse,
+    LnurlResponseModel
 )
 from .types import Lnurl
 

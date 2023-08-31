@@ -2,10 +2,19 @@ import json
 import os
 import re
 from hashlib import sha256
-from typing import Annotated, List, Optional, Tuple, Union
+from typing import (
+    Annotated,
+    Any,
+    List,
+    Literal,
+    Optional,
+    Tuple,
+    Union,
+)
 
-from pydantic import Field, HttpUrl, Json, PositiveInt, TypeAdapter, UrlConstraints, ValidationError
-from pydantic.functional_validators import AfterValidator
+from pydantic_core import Url
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, Json, PositiveInt, TypeAdapter, UrlConstraints, ValidationError
+from pydantic.functional_validators import AfterValidator, BeforeValidator
 
 from .exceptions import InvalidLnurlPayMetadata
 from .helpers import _bech32_decode, _lnurl_clean, _lnurl_decode
@@ -63,6 +72,15 @@ def strict_rfc3986_validator(value: str) -> str:
             raise ValidationError
     return value
 
+
+LightningNodeUri = Annotated[
+    Url, 
+    UrlConstraints(
+        max_length=2047,
+        allowed_schemes=["lightning", "uri"],
+        host_required=False,
+        ),
+    ]
 
 # Secure web URL
 ClearnetUrl = Annotated[
@@ -130,34 +148,67 @@ class LightningInvoice(Bech32):
         raise NotImplementedError
 
 
-class LightningNodeUri(ReprMixin, str):
-    """Remote node address of form `node_key@ip_address:port_number`."""
+def mandatory_lightning_scheme_sanitizer(value: str) -> str:
+    """adds ln scheme if missing to satisfy rfc3986 and pydandic url checking
+        This is to work around the fact that pydantic enforces schemes
+    """
+    if not value.startswith("lightning://") or not value.startswith("uri://"):
+        return f"lightning://{value}"
 
-    # __slots__ = ("key", "ip", "port")
+LnNodeUriAnnotated = Annotated[
+    Url, 
+    UrlConstraints(
+        max_length=2047,
+        allowed_schemes=["lightning"],
+        host_required=False,
+        ),
+    BeforeValidator(mandatory_lightning_scheme_sanitizer),
+    AfterValidator(ctrl_characters_validator),
+    AfterValidator(strict_rfc3986_validator),
+    ]
 
-    # def __new__(cls, uri: str, **_) -> "LightningNodeUri":
-    #     return str.__new__(cls, uri)
+# class LnurlChannelResponse(LnurlResponseModel):
+#     tag: Literal["channelRequest"] = "channelRequest"
+#     uri: LnNodeUriAnnotated
+#     callback: Union[ClearnetUrl, OnionUrl, DebugUrl]
+#     k1: str
+    
+class LightningNodeUri(BaseModel):
+    uri: LnNodeUriAnnotated
 
-    # def __init__(self, uri: str, *, key: Optional[str] = None, ip: Optional[str] = None, port: Optional[str] = None):
-    #     str.__init__(uri)
-    #     self.key = key
-    #     self.ip = ip
-    #     self.port = port
+    def __init__(self, uri: str):
+        """
+        This is way to avoid having to pass 'uri=' to the constructor
+        """
+        super().__init__(uri=uri)
 
-    # @classmethod
-    # def __get_validators__(cls):
-    #     yield str_validator
-    #     yield cls.validate
 
-    # @classmethod
-    # def validate(cls, value: str) -> "LightningNodeUri":
-    #     try:
-    #         key, netloc = value.split("@")
-    #         ip, port = netloc.split(":")
-    #     except Exception:
-    #         raise ValueError
+    def __str__(self) -> str:
+        """
+        Omit the scheme and :// from the string representation.
+        """ 
+        return f"{self.key}@{self.ip}:{self.port}"
 
-    #     return cls(value, key=key, ip=ip, port=port)
+    @property
+    def key(self) -> str:
+        """
+        wrapper to get the username part of the uri which is the key
+        """
+        return self.uri.username
+    
+    @property
+    def ip(self) -> str:
+        """
+        wrapper to get the host part of the uri which is the ip (address)
+        """
+        return self.uri.host
+    
+    @property
+    def port(self) -> int:
+        return self.uri.port
+
+
+LnNodeUriModel = Annotated[LightningNodeUri, ...]
 
 
 class Lnurl(ReprMixin, str):
